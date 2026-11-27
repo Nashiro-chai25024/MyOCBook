@@ -182,12 +182,16 @@ export function updateWorldCard(id: string, input: WorldCardInput): void {
   saveWorlds(updated);
 }
 
-/** 世界観を削除し、所属していたキャラクターの worldId を未設定に戻します */
-export function deleteWorldCard(id: string): void {
+/** 世界観を削除します。deleteAssignedCharacters が true の場合は所属キャラクターも削除します */
+export function deleteWorldCard(
+  id: string,
+  deleteAssignedCharacters = false
+): void {
   saveWorlds(loadWorlds().filter((w) => w.id !== id));
-  const updatedChars = loadCharacters().map((c) =>
-    c.worldId === id ? { ...c, worldId: null } : c
-  );
+  const currentChars = loadCharacters();
+  const updatedChars = deleteAssignedCharacters
+    ? currentChars.filter((c) => c.worldId !== id)
+    : currentChars.map((c) => (c.worldId === id ? { ...c, worldId: null } : c));
   saveCharacters(updatedChars);
 }
 

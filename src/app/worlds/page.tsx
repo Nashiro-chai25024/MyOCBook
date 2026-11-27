@@ -8,7 +8,6 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import AppHeader from "@/components/AppHeader";
 import {
   createWorldCard,
-  deleteWorldCard,
   getServerWorldsSnapshot,
   loadWorlds,
   subscribeData,
@@ -36,7 +35,6 @@ export default function WorldsPage() {
   const [name, setName] = useState<string>("");
   const [summary, setSummary] = useState<string>("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<boolean>(false);
 
   useEffect(() => {
     if (!modalOpen) return;
@@ -52,7 +50,6 @@ export default function WorldsPage() {
     setName("");
     setSummary("");
     setErrorMessage(null);
-    setConfirmDelete(false);
     setModalOpen(true);
   };
 
@@ -61,7 +58,6 @@ export default function WorldsPage() {
     setName(world.name);
     setSummary(world.summary);
     setErrorMessage(null);
-    setConfirmDelete(false);
     setModalOpen(true);
   };
 
@@ -77,12 +73,6 @@ export default function WorldsPage() {
     } else {
       createWorldCard({ name, summary });
     }
-    setModalOpen(false);
-  };
-
-  const handleDelete = () => {
-    if (!editingId) return;
-    deleteWorldCard(editingId);
     setModalOpen(false);
   };
 
@@ -221,53 +211,20 @@ export default function WorldsPage() {
                 <p className="text-xs font-medium text-danger">{errorMessage}</p>
               )}
 
-              <div className="flex items-center justify-between border-t border-border-subtle pt-4">
-                {editingId ? (
-                  confirmDelete ? (
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={handleDelete}
-                        className="rounded-lg bg-danger px-3 py-1.5 text-xs font-semibold text-white"
-                      >
-                        本当に削除
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setConfirmDelete(false)}
-                        className="text-xs text-foreground-muted"
-                      >
-                        中止
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setConfirmDelete(true)}
-                      className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-danger hover:bg-danger/10"
-                    >
-                      削除
-                    </button>
-                  )
-                ) : (
-                  <div />
-                )}
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setModalOpen(false)}
-                    className="rounded-lg border border-border-subtle px-3.5 py-1.5 text-xs text-foreground-muted hover:bg-surface-muted"
-                  >
-                    キャンセル
-                  </button>
-                  <button
-                    type="submit"
-                    className="rounded-lg bg-accent px-4 py-1.5 text-xs font-semibold text-accent-foreground hover:opacity-90"
-                  >
-                    保存
-                  </button>
-                </div>
+              <div className="flex items-center justify-end gap-2 border-t border-border-subtle pt-4">
+                <button
+                  type="button"
+                  onClick={() => setModalOpen(false)}
+                  className="rounded-lg border border-border-subtle px-3.5 py-1.5 text-xs text-foreground-muted hover:bg-surface-muted"
+                >
+                  キャンセル
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-lg bg-accent px-4 py-1.5 text-xs font-semibold text-accent-foreground hover:opacity-90"
+                >
+                  保存
+                </button>
               </div>
             </form>
           </div>

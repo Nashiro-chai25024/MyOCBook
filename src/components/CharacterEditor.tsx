@@ -9,7 +9,6 @@ import { useRouter } from "next/navigation";
 import {
   createCharacterCard,
   createId,
-  deleteCharacterCard,
   getServerWorldsSnapshot,
   isValidHexColor,
   loadWorlds,
@@ -119,7 +118,6 @@ export default function CharacterEditor({
     initialCharacter?.customFields ?? []
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<boolean>(false);
 
   const currentBirthday = formatBirthday(
     birthdayMode,
@@ -210,12 +208,6 @@ export default function CharacterEditor({
     } else {
       router.push("/characters");
     }
-  };
-
-  const handleDelete = () => {
-    if (!initialCharacter) return;
-    deleteCharacterCard(initialCharacter.id);
-    router.push("/characters");
   };
 
   return (
@@ -551,53 +543,20 @@ export default function CharacterEditor({
       )}
 
       {/* フッターアクション */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
-        {initialCharacter ? (
-          confirmDelete ? (
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleDelete}
-                className="rounded-lg bg-danger px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
-              >
-                本当に削除する
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirmDelete(false)}
-                className="px-2 py-1.5 text-xs text-foreground-muted hover:text-foreground"
-              >
-                キャンセル
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setConfirmDelete(true)}
-              className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-danger hover:bg-danger/10"
-            >
-              削除
-            </button>
-          )
-        ) : (
-          <div />
-        )}
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => (onDone ? onDone() : router.push("/characters"))}
-            className="rounded-lg border border-border-subtle px-4 py-2 text-sm text-foreground-muted transition hover:bg-surface-muted hover:text-foreground"
-          >
-            キャンセル
-          </button>
+      <div className="flex flex-wrap items-center justify-end gap-2 px-4 py-4 sm:px-6">
+        <button
+          type="button"
+          onClick={() => (onDone ? onDone() : router.push("/characters"))}
+          className="rounded-lg border border-border-subtle px-4 py-2 text-sm text-foreground-muted transition hover:bg-surface-muted hover:text-foreground"
+        >
+          キャンセル
+        </button>
           <button
             type="submit"
             className="rounded-lg bg-accent px-5 py-2 text-sm font-semibold text-accent-foreground transition hover:opacity-90"
           >
             保存
           </button>
-        </div>
       </div>
     </form>
   );
