@@ -143,8 +143,15 @@ export default function AppHeader({
 
             <div className="mt-6 border-t border-border-subtle pt-4">
               <p className="mb-2 px-3 text-[11px] font-semibold text-foreground-muted">
-                管理
+                管理・設定
               </p>
+              <Link
+                href="/settings"
+                onClick={() => setMenuOpen(false)}
+                className="block rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition hover:bg-surface-muted"
+              >
+                設定
+              </Link>
               <Link
                 href="/manage/delete"
                 onClick={() => setMenuOpen(false)}

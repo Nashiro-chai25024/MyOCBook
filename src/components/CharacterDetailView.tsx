@@ -19,12 +19,15 @@ export default function CharacterDetailView({
 }: CharacterDetailViewProps) {
   return (
     <>
-      <article className="rounded-xl border border-border-subtle bg-surface shadow-sm">
-        {/* 名前 */}
+      <article className="mx-auto max-w-3xl rounded-xl border border-border-subtle bg-surface shadow-sm">
+        {/* 名前・ふりがな */}
         <div className="border-b border-border-subtle px-4 py-4 sm:px-6">
           <span className="mb-1 block text-xs font-semibold text-foreground-muted">
             名前
           </span>
+          {character.nameKana && (
+            <p className="text-xs text-foreground-muted">{character.nameKana}</p>
+          )}
           <h2 className="text-lg font-bold text-foreground">
             {character.name}
           </h2>
@@ -40,14 +43,22 @@ export default function CharacterDetailView({
           </p>
         </div>
 
-        {/* 誕生日 ｜ 性別 */}
-        <div className="grid grid-cols-1 border-b border-border-subtle sm:grid-cols-2">
+        {/* 誕生日 ｜ 年齢 ｜ 性別 */}
+        <div className="grid grid-cols-1 border-b border-border-subtle sm:grid-cols-3">
           <div className="border-b border-border-subtle px-4 py-3.5 sm:border-r sm:border-b-0 sm:px-6">
             <span className="mb-1 block text-xs font-semibold text-foreground-muted">
               誕生日
             </span>
             <p className="text-sm text-foreground">
               {character.birthday || "—"}
+            </p>
+          </div>
+          <div className="border-b border-border-subtle px-4 py-3.5 sm:border-r sm:border-b-0 sm:px-6">
+            <span className="mb-1 block text-xs font-semibold text-foreground-muted">
+              年齢
+            </span>
+            <p className="text-sm text-foreground">
+              {character.age || "—"}
             </p>
           </div>
           <div className="px-4 py-3.5 sm:px-6">

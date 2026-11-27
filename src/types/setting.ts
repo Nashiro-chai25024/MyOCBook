@@ -28,8 +28,10 @@ export interface WorldCardInput {
 export interface CharacterCard {
   id: string;
   name: string;
+  nameKana?: string;
   worldId: string | null;
   birthday: string;
+  age?: string;
   gender: string;
   motif: string;
   mainColors: string[];
@@ -42,8 +44,10 @@ export interface CharacterCard {
 /** キャラクターの作成・編集入力 */
 export interface CharacterCardInput {
   name: string;
+  nameKana: string;
   worldId: string | null;
   birthday: string;
+  age: string;
   gender: string;
   motif: string;
   mainColors: string[];
@@ -54,8 +58,10 @@ export interface CharacterCardInput {
 /** 長文アプリ化を防ぐための文字数・色数・項目数の上限 */
 export const SETTING_LIMITS = {
   NAME_MAX: 50,
+  NAME_KANA_MAX: 50,
   SUMMARY_MAX: 100,
   BIRTHDAY_MAX: 30,
+  AGE_MAX: 30,
   GENDER_MAX: 30,
   MOTIF_MAX: 100,
   FIELD_LABEL_MAX: 30,

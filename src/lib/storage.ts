@@ -61,8 +61,14 @@ export function validateCharacterInput(input: CharacterCardInput): string | null
   if (trimmed.length > SETTING_LIMITS.NAME_MAX) {
     return `名前は${SETTING_LIMITS.NAME_MAX}文字以内で入力してください。`;
   }
+  if (input.nameKana.length > SETTING_LIMITS.NAME_KANA_MAX) {
+    return `ふりがなは${SETTING_LIMITS.NAME_KANA_MAX}文字以内で入力してください。`;
+  }
   if (input.birthday.length > SETTING_LIMITS.BIRTHDAY_MAX) {
     return `誕生日は${SETTING_LIMITS.BIRTHDAY_MAX}文字以内で入力してください。`;
+  }
+  if (input.age.length > SETTING_LIMITS.AGE_MAX) {
+    return `年齢は${SETTING_LIMITS.AGE_MAX}文字以内で入力してください。`;
   }
   if (input.gender.length > SETTING_LIMITS.GENDER_MAX) {
     return `性別は${SETTING_LIMITS.GENDER_MAX}文字以内で入力してください。`;
@@ -234,8 +240,10 @@ export function createCharacterCard(input: CharacterCardInput): CharacterCard {
   const card: CharacterCard = {
     id: createId(),
     name: input.name.trim().slice(0, SETTING_LIMITS.NAME_MAX),
+    nameKana: input.nameKana.trim().slice(0, SETTING_LIMITS.NAME_KANA_MAX),
     worldId: input.worldId,
     birthday: input.birthday.trim().slice(0, SETTING_LIMITS.BIRTHDAY_MAX),
+    age: input.age.trim().slice(0, SETTING_LIMITS.AGE_MAX),
     gender: input.gender.trim().slice(0, SETTING_LIMITS.GENDER_MAX),
     motif: input.motif.trim().slice(0, SETTING_LIMITS.MOTIF_MAX),
     mainColors: input.mainColors.slice(0, SETTING_LIMITS.MAIN_COLORS_MAX),
@@ -255,8 +263,10 @@ export function updateCharacterCard(id: string, input: CharacterCardInput): void
       ? {
           ...c,
           name: input.name.trim().slice(0, SETTING_LIMITS.NAME_MAX),
+          nameKana: input.nameKana.trim().slice(0, SETTING_LIMITS.NAME_KANA_MAX),
           worldId: input.worldId,
           birthday: input.birthday.trim().slice(0, SETTING_LIMITS.BIRTHDAY_MAX),
+          age: input.age.trim().slice(0, SETTING_LIMITS.AGE_MAX),
           gender: input.gender.trim().slice(0, SETTING_LIMITS.GENDER_MAX),
           motif: input.motif.trim().slice(0, SETTING_LIMITS.MOTIF_MAX),
           mainColors: input.mainColors.slice(0, SETTING_LIMITS.MAIN_COLORS_MAX),

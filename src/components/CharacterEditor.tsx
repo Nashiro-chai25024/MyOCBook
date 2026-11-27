@@ -6,6 +6,8 @@
 
 import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
+import DictionaryPanel from "@/components/DictionaryPanel";
+import type { CategoryKey } from "@/data/dictionaries";
 import {
   createCharacterCard,
   createId,
@@ -16,6 +18,11 @@ import {
   updateCharacterCard,
   validateCharacterInput,
 } from "@/lib/storage";
+import {
+  getServerUserSettingsSnapshot,
+  loadUserSettings,
+  subscribeUserSettings,
+} from "@/lib/userSettings";
 import {
   SETTING_LIMITS,
   type CharacterCard,
@@ -31,6 +38,7 @@ interface CharacterEditorProps {
 }
 
 type BirthdayMode = "ymd" | "free";
+type ColorTarget = { group: "main" | "sub"; index: number };
 
 const DEFAULT_MAIN_COLOR = "#5c6b73";
 const DEFAULT_SUB_COLOR = "#9db4c0";
@@ -90,10 +98,18 @@ export default function CharacterEditor({
     loadWorlds,
     getServerWorldsSnapshot
   );
+  const userSettings = useSyncExternalStore(
+    subscribeUserSettings,
+    loadUserSettings,
+    getServerUserSettingsSnapshot
+  );
 
   const initialBirthday = parseBirthday(initialCharacter?.birthday ?? "");
 
   const [name, setName] = useState<string>(initialCharacter?.name ?? "");
+  const [nameKana, setNameKana] = useState<string>(
+    initialCharacter?.nameKana ?? ""
+  );
   const [worldId, setWorldId] = useState<string>(
     initialCharacter?.worldId ?? ""
   );
@@ -104,6 +120,7 @@ export default function CharacterEditor({
   const [birthMonth, setBirthMonth] = useState<string>(initialBirthday.month);
   const [birthDay, setBirthDay] = useState<string>(initialBirthday.day);
   const [birthFree, setBirthFree] = useState<string>(initialBirthday.free);
+  const [age, setAge] = useState<string>(initialCharacter?.age ?? "");
   const [gender, setGender] = useState<string>(initialCharacter?.gender ?? "");
   const [motif, setMotif] = useState<string>(initialCharacter?.motif ?? "");
   const [mainColors, setMainColors] = useState<string[]>(
@@ -118,6 +135,49 @@ export default function CharacterEditor({
     initialCharacter?.customFields ?? []
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [dictOpen, setDictOpen] = useState<boolean>(false);
+  const [dictCategory, setDictCategory] = useState<CategoryKey>("flower");
+  const [colorTarget, setColorTarget] = useState<ColorTarget>({
+    group: "main",
+    index: 0,
+  });
+
+  const handleOpenColorDictionary = (
+    group: "main" | "sub",
+    index: number
+  ) => {
+    setColorTarget({ group, index });
+    setDictCategory("color");
+    setDictOpen(true);
+  };
+
+  const handleSelectColorFromDict = (hex: string) => {
+    if (colorTarget.group === "main") {
+      setMainColors((prev) => {
+        if (colorTarget.index < prev.length) {
+          return prev.map((c, i) => (i === colorTarget.index ? hex : c));
+        }
+        return prev.length < SETTING_LIMITS.MAIN_COLORS_MAX
+          ? [...prev, hex]
+          : prev;
+      });
+      return;
+    }
+    setSubColors((prev) => {
+      if (colorTarget.index < prev.length) {
+        return prev.map((c, i) => (i === colorTarget.index ? hex : c));
+      }
+      return prev.length < SETTING_LIMITS.SUB_COLORS_MAX ? [...prev, hex] : prev;
+    });
+  };
+
+  const handleSelectMotifFromDict = (text: string) => {
+    setMotif((prev) => {
+      const current = prev.trim();
+      const next = current ? `${current} / ${text}` : text;
+      return next.slice(0, SETTING_LIMITS.MOTIF_MAX);
+    });
+  };
 
   const currentBirthday = formatBirthday(
     birthdayMode,
@@ -185,8 +245,10 @@ export default function CharacterEditor({
     e.preventDefault();
     const input: CharacterCardInput = {
       name,
+      nameKana,
       worldId: worldId || null,
       birthday: currentBirthday,
+      age,
       gender,
       motif,
       mainColors,
@@ -210,35 +272,102 @@ export default function CharacterEditor({
     }
   };
 
+  const splitDirectionClass = [
+    userSettings.mobileDictionarySide === "top"
+      ? "flex-col-reverse"
+      : "flex-col",
+    userSettings.pcDictionarySide === "left"
+      ? "lg:flex-row-reverse"
+      : "lg:flex-row",
+  ].join(" ");
+
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="rounded-xl border border-border-subtle bg-surface shadow-sm"
-    >
-      {/* 名前 */}
-      <div className="border-b border-border-subtle px-4 py-3.5 sm:px-6">
-        <div className="mb-1 flex items-center justify-between">
-          <label
-            htmlFor="char-name"
-            className="text-xs font-semibold text-foreground-muted"
-          >
-            名前 <span className="text-danger">*</span>
-          </label>
-          <span className="text-[11px] text-foreground-muted">
-            {name.length} / {SETTING_LIMITS.NAME_MAX}
-          </span>
+    <div className={dictOpen ? "space-y-4" : "mx-auto max-w-3xl space-y-4"}>
+      {/* 辞書パネル切り替えバー */}
+      <div className="flex items-center justify-end">
+        <button
+          type="button"
+          onClick={() => setDictOpen((prev) => !prev)}
+          className={`inline-flex items-center gap-1.5 rounded-lg border px-3.5 py-1.5 text-xs font-semibold transition ${
+            dictOpen
+              ? "border-accent bg-accent text-accent-foreground"
+              : "border-border-subtle bg-surface text-foreground hover:bg-surface-muted"
+          }`}
+        >
+          <span>{dictOpen ? "辞書を閉じる" : "辞書を開く"}</span>
+        </button>
+      </div>
+
+      <div
+        className={
+          dictOpen ? `flex gap-4 ${splitDirectionClass}` : "block"
+        }
+      >
+        <form
+          onSubmit={handleSubmit}
+          autoComplete="off"
+          className={`rounded-xl border border-border-subtle bg-surface shadow-sm ${
+            dictOpen
+              ? "w-full lg:w-1/2 lg:max-h-[calc(100vh-10rem)] lg:overflow-y-auto"
+              : "w-full"
+          }`}
+        >
+      {/* 名前・ふりがな */}
+      <div className="space-y-3 border-b border-border-subtle px-4 py-3.5 sm:px-6">
+        <div>
+          <div className="mb-1 flex items-center justify-between">
+            <label
+              htmlFor="oc-field-title"
+              className="text-xs font-semibold text-foreground-muted"
+            >
+              名前 <span className="text-danger">*</span>
+            </label>
+            <span className="text-[11px] text-foreground-muted">
+              {name.length} / {SETTING_LIMITS.NAME_MAX}
+            </span>
+          </div>
+          <input
+            id="oc-field-title"
+            name="oc-field-title"
+            type="text"
+            autoComplete="off"
+            data-lpignore="true"
+            data-1p-ignore="true"
+            maxLength={SETTING_LIMITS.NAME_MAX}
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value);
+              if (errorMessage) setErrorMessage(null);
+            }}
+            className="w-full bg-transparent text-base font-medium text-foreground outline-none"
+          />
         </div>
-        <input
-          id="char-name"
-          type="text"
-          maxLength={SETTING_LIMITS.NAME_MAX}
-          value={name}
-          onChange={(e) => {
-            setName(e.target.value);
-            if (errorMessage) setErrorMessage(null);
-          }}
-          className="w-full bg-transparent text-base font-medium text-foreground outline-none"
-        />
+
+        <div className="border-t border-border-subtle/60 pt-2.5">
+          <div className="mb-1 flex items-center justify-between">
+            <label
+              htmlFor="oc-field-kana"
+              className="text-xs font-semibold text-foreground-muted"
+            >
+              ふりがな
+            </label>
+            <span className="text-[11px] text-foreground-muted">
+              {nameKana.length} / {SETTING_LIMITS.NAME_KANA_MAX}
+            </span>
+          </div>
+          <input
+            id="oc-field-kana"
+            name="oc-field-kana"
+            type="text"
+            autoComplete="off"
+            data-lpignore="true"
+            data-1p-ignore="true"
+            maxLength={SETTING_LIMITS.NAME_KANA_MAX}
+            value={nameKana}
+            onChange={(e) => setNameKana(e.target.value)}
+            className="w-full bg-transparent text-sm text-foreground outline-none"
+          />
+        </div>
       </div>
 
       {/* 所属世界 */}
@@ -270,8 +399,8 @@ export default function CharacterEditor({
         </select>
       </div>
 
-      {/* 誕生日 ｜ 性別 */}
-      <div className="grid grid-cols-1 border-b border-border-subtle sm:grid-cols-2">
+      {/* 誕生日 ｜ 年齢 ｜ 性別 */}
+      <div className="grid grid-cols-1 border-b border-border-subtle sm:grid-cols-3">
         <div className="border-b border-border-subtle px-4 py-3.5 sm:border-r sm:border-b-0 sm:px-6">
           <div className="mb-2 flex items-center justify-between gap-2">
             <span className="text-xs font-semibold text-foreground-muted">
@@ -304,32 +433,38 @@ export default function CharacterEditor({
           </div>
 
           {birthdayMode === "ymd" ? (
-            <div className="flex flex-wrap items-center gap-1.5 text-sm text-foreground">
+            <div className="flex flex-wrap items-center gap-1 text-sm text-foreground">
               <input
                 type="text"
                 aria-label="誕生年"
+                autoComplete="off"
+                data-lpignore="true"
                 maxLength={10}
                 value={birthYear}
                 onChange={(e) => setBirthYear(e.target.value)}
-                className="w-16 border-b border-border-subtle bg-transparent py-0.5 text-center text-sm text-foreground outline-none focus:border-foreground"
+                className="w-12 border-b border-border-subtle bg-transparent py-0.5 text-center text-sm text-foreground outline-none focus:border-foreground"
               />
               <span className="text-xs text-foreground-muted">年</span>
               <input
                 type="text"
                 aria-label="誕生月"
+                autoComplete="off"
+                data-lpignore="true"
                 maxLength={6}
                 value={birthMonth}
                 onChange={(e) => setBirthMonth(e.target.value)}
-                className="w-12 border-b border-border-subtle bg-transparent py-0.5 text-center text-sm text-foreground outline-none focus:border-foreground"
+                className="w-10 border-b border-border-subtle bg-transparent py-0.5 text-center text-sm text-foreground outline-none focus:border-foreground"
               />
               <span className="text-xs text-foreground-muted">月</span>
               <input
                 type="text"
                 aria-label="誕生日"
+                autoComplete="off"
+                data-lpignore="true"
                 maxLength={6}
                 value={birthDay}
                 onChange={(e) => setBirthDay(e.target.value)}
-                className="w-12 border-b border-border-subtle bg-transparent py-0.5 text-center text-sm text-foreground outline-none focus:border-foreground"
+                className="w-10 border-b border-border-subtle bg-transparent py-0.5 text-center text-sm text-foreground outline-none focus:border-foreground"
               />
               <span className="text-xs text-foreground-muted">日</span>
             </div>
@@ -337,6 +472,8 @@ export default function CharacterEditor({
             <input
               type="text"
               aria-label="誕生日（自由記述）"
+              autoComplete="off"
+              data-lpignore="true"
               maxLength={SETTING_LIMITS.BIRTHDAY_MAX}
               value={birthFree}
               onChange={(e) => setBirthFree(e.target.value)}
@@ -344,21 +481,69 @@ export default function CharacterEditor({
             />
           )}
         </div>
-        <div className="px-4 py-3.5 sm:px-6">
+
+        {/* 年齢 */}
+        <div className="border-b border-border-subtle px-4 py-3.5 sm:border-r sm:border-b-0 sm:px-6">
           <div className="mb-1 flex items-center justify-between">
             <label
-              htmlFor="char-gender"
+              htmlFor="oc-field-age"
+              className="text-xs font-semibold text-foreground-muted"
+            >
+              年齢
+            </label>
+            <span className="text-[11px] text-foreground-muted">
+              {age.length} / {SETTING_LIMITS.AGE_MAX}
+            </span>
+          </div>
+          <input
+            id="oc-field-age"
+            name="oc-field-age"
+            type="text"
+            autoComplete="off"
+            data-lpignore="true"
+            data-1p-ignore="true"
+            maxLength={SETTING_LIMITS.AGE_MAX}
+            value={age}
+            onChange={(e) => setAge(e.target.value)}
+            className="w-full bg-transparent text-sm text-foreground outline-none"
+          />
+        </div>
+
+        {/* 性別（ワンタップ + 自由記述） */}
+        <div className="px-4 py-3.5 sm:px-6">
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <label
+              htmlFor="oc-field-gender"
               className="text-xs font-semibold text-foreground-muted"
             >
               性別
             </label>
-            <span className="text-[11px] text-foreground-muted">
-              {gender.length} / {SETTING_LIMITS.GENDER_MAX}
-            </span>
+            <div className="flex items-center gap-1">
+              {(["女性", "男性"] as const).map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() =>
+                    setGender((prev) => (prev === preset ? "" : preset))
+                  }
+                  className={`rounded border px-2 py-0.5 text-[11px] transition ${
+                    gender === preset
+                      ? "border-accent bg-accent font-semibold text-accent-foreground"
+                      : "border-border-subtle bg-surface-muted/60 text-foreground-muted hover:text-foreground"
+                  }`}
+                >
+                  {preset}
+                </button>
+              ))}
+            </div>
           </div>
           <input
-            id="char-gender"
+            id="oc-field-gender"
+            name="oc-field-gender"
             type="text"
+            autoComplete="off"
+            data-lpignore="true"
+            data-1p-ignore="true"
             maxLength={SETTING_LIMITS.GENDER_MAX}
             value={gender}
             onChange={(e) => setGender(e.target.value)}
@@ -391,28 +576,32 @@ export default function CharacterEditor({
 
         {/* カラー設定（メイン1〜2色 / サブ0〜2色） */}
         <div className="grid gap-3 rounded-lg bg-surface-muted/60 p-3 sm:grid-cols-2">
-          {[
-            {
-              title: "メインカラー",
-              colors: mainColors,
-              max: SETTING_LIMITS.MAIN_COLORS_MAX,
-              min: SETTING_LIMITS.MAIN_COLORS_MIN,
-              fallback: DEFAULT_MAIN_COLOR,
-              onAdd: handleAddMainColor,
-              onChange: handleMainColorChange,
-              onRemove: handleRemoveMainColor,
-            },
-            {
-              title: "サブカラー",
-              colors: subColors,
-              max: SETTING_LIMITS.SUB_COLORS_MAX,
-              min: 0,
-              fallback: DEFAULT_SUB_COLOR,
-              onAdd: handleAddSubColor,
-              onChange: handleSubColorChange,
-              onRemove: handleRemoveSubColor,
-            },
-          ].map((group) => (
+          {(
+            [
+              {
+                key: "main" as const,
+                title: "メインカラー",
+                colors: mainColors,
+                max: SETTING_LIMITS.MAIN_COLORS_MAX,
+                min: SETTING_LIMITS.MAIN_COLORS_MIN,
+                fallback: DEFAULT_MAIN_COLOR,
+                onAdd: handleAddMainColor,
+                onChange: handleMainColorChange,
+                onRemove: handleRemoveMainColor,
+              },
+              {
+                key: "sub" as const,
+                title: "サブカラー",
+                colors: subColors,
+                max: SETTING_LIMITS.SUB_COLORS_MAX,
+                min: 0,
+                fallback: DEFAULT_SUB_COLOR,
+                onAdd: handleAddSubColor,
+                onChange: handleSubColorChange,
+                onRemove: handleRemoveSubColor,
+              },
+            ] as const
+          ).map((group) => (
             <div key={group.title}>
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-xs font-medium text-foreground-muted">
@@ -437,10 +626,10 @@ export default function CharacterEditor({
                     return (
                       <div
                         key={`${group.title}-${index}`}
-                        className="flex items-center gap-2"
+                        className="flex flex-wrap items-center gap-1.5"
                       >
                         <label
-                          className="relative flex h-8 w-12 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-border-subtle shadow-xs"
+                          className="relative flex h-8 w-10 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-border-subtle shadow-xs"
                           style={{ backgroundColor: safeColor }}
                           title="クリックして色を選択"
                         >
@@ -460,6 +649,15 @@ export default function CharacterEditor({
                           onChange={(e) => group.onChange(index, e.target.value)}
                           className="w-20 rounded border border-border-subtle bg-surface px-2 py-1 font-mono text-xs uppercase text-foreground outline-none focus:border-foreground"
                         />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleOpenColorDictionary(group.key, index)
+                          }
+                          className="rounded border border-border-subtle bg-surface px-2 py-1 text-[11px] text-foreground-muted transition hover:bg-surface-muted hover:text-foreground"
+                        >
+                          辞書
+                        </button>
                         {group.colors.length > group.min && (
                           <button
                             type="button"
@@ -559,5 +757,68 @@ export default function CharacterEditor({
           </button>
       </div>
     </form>
+
+        {/* 2分割時の辞書パネル */}
+        {dictOpen && (
+          <aside className="max-h-[45vh] w-full overflow-y-auto rounded-xl border border-border-subtle bg-surface p-4 shadow-sm lg:max-h-[calc(100vh-10rem)] lg:w-1/2">
+            <div className="mb-3 flex items-center justify-between border-b border-border-subtle pb-2">
+              <span className="text-xs font-bold text-foreground">
+                辞書パネル
+              </span>
+              <button
+                type="button"
+                onClick={() => setDictOpen(false)}
+                className="text-xs text-foreground-muted hover:text-foreground"
+              >
+                ✕ 閉じる
+              </button>
+            </div>
+
+            {dictCategory === "color" && (
+              <div className="mb-3 flex flex-wrap items-center gap-1.5 rounded-lg bg-surface-muted/60 p-2 text-[11px]">
+                <span className="font-semibold text-foreground-muted">
+                  反映先：
+                </span>
+                {[
+                  { group: "main" as const, index: 0, label: "メイン1" },
+                  { group: "main" as const, index: 1, label: "メイン2" },
+                  { group: "sub" as const, index: 0, label: "サブ1" },
+                  { group: "sub" as const, index: 1, label: "サブ2" },
+                ].map((slot) => {
+                  const isActive =
+                    colorTarget.group === slot.group &&
+                    colorTarget.index === slot.index;
+                  return (
+                    <button
+                      key={slot.label}
+                      type="button"
+                      onClick={() =>
+                        setColorTarget({ group: slot.group, index: slot.index })
+                      }
+                      className={`rounded border px-2 py-0.5 transition ${
+                        isActive
+                          ? "border-accent bg-accent font-semibold text-accent-foreground"
+                          : "border-border-subtle bg-surface text-foreground-muted hover:text-foreground"
+                      }`}
+                    >
+                      {slot.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            <DictionaryPanel
+              category={dictCategory}
+              allowCategorySwitch
+              onCategoryChange={setDictCategory}
+              onSelectColor={(hex) => handleSelectColorFromDict(hex)}
+              onSelectMotif={handleSelectMotifFromDict}
+              compact
+            />
+          </aside>
+        )}
+      </div>
+    </div>
   );
 }

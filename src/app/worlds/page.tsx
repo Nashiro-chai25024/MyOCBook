@@ -159,11 +159,11 @@ export default function WorldsPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} autoComplete="off" className="space-y-4">
               <div>
                 <div className="mb-1 flex items-center justify-between">
                   <label
-                    htmlFor="world-name"
+                    htmlFor="oc-world-title"
                     className="text-xs font-semibold text-foreground-muted"
                   >
                     世界名 <span className="text-danger">*</span>
@@ -173,8 +173,12 @@ export default function WorldsPage() {
                   </span>
                 </div>
                 <input
-                  id="world-name"
+                  id="oc-world-title"
+                  name="oc-world-title"
                   type="text"
+                  autoComplete="off"
+                  data-lpignore="true"
+                  data-1p-ignore="true"
                   maxLength={SETTING_LIMITS.NAME_MAX}
                   value={name}
                   onChange={(e) => {
