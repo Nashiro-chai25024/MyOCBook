@@ -4,10 +4,11 @@
  */
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import DictionaryPanel from "@/components/DictionaryPanel";
-import type { CategoryKey } from "@/data/dictionaries";
+import { useNavigationGuard } from "@/components/NavigationGuardContext";
+import { findColorNameByHex, type CategoryKey } from "@/data/dictionaries";
 import {
   createCharacterCard,
   createId,
@@ -33,6 +34,8 @@ import {
 interface CharacterEditorProps {
   /** 編集対象データ（新規作成時は null） */
   initialCharacter: CharacterCard | null;
+  /** 新規作成時に初期選択する所属世界ID */
+  defaultWorldId?: string;
   /** 保存・キャンセル時に一覧遷移の代わりに行うコールバック */
   onDone?: () => void;
 }
@@ -90,9 +93,11 @@ function toSafePickerColor(color: string, fallback: string): string {
 
 export default function CharacterEditor({
   initialCharacter,
+  defaultWorldId = "",
   onDone,
 }: CharacterEditorProps) {
   const router = useRouter();
+  const { registerGuard } = useNavigationGuard();
   const worlds = useSyncExternalStore(
     subscribeData,
     loadWorlds,
@@ -111,7 +116,7 @@ export default function CharacterEditor({
     initialCharacter?.nameKana ?? ""
   );
   const [worldId, setWorldId] = useState<string>(
-    initialCharacter?.worldId ?? ""
+    initialCharacter?.worldId ?? defaultWorldId
   );
   const [birthdayMode, setBirthdayMode] = useState<BirthdayMode>(
     initialBirthday.mode
@@ -141,6 +146,91 @@ export default function CharacterEditor({
     group: "main",
     index: 0,
   });
+  const [pendingNavHref, setPendingNavHref] = useState<string | null>(null);
+  const [pendingDeleteField, setPendingDeleteField] =
+    useState<CustomField | null>(null);
+
+  const initialSnapshot = useMemo(
+    () =>
+      JSON.stringify({
+        name: initialCharacter?.name ?? "",
+        nameKana: initialCharacter?.nameKana ?? "",
+        worldId: initialCharacter?.worldId ?? defaultWorldId,
+        birthday: parseBirthday(initialCharacter?.birthday ?? ""),
+        age: initialCharacter?.age ?? "",
+        gender: initialCharacter?.gender ?? "",
+        motif: initialCharacter?.motif ?? "",
+        mainColors: initialCharacter?.mainColors.length
+          ? initialCharacter.mainColors
+          : [DEFAULT_MAIN_COLOR],
+        subColors: initialCharacter?.subColors ?? [],
+        customFields: initialCharacter?.customFields ?? [],
+      }),
+    [initialCharacter, defaultWorldId]
+  );
+
+  const currentSnapshot = useMemo(
+    () =>
+      JSON.stringify({
+        name,
+        nameKana,
+        worldId,
+        birthday: {
+          mode: birthdayMode,
+          year: birthYear,
+          month: birthMonth,
+          day: birthDay,
+          free: birthFree,
+        },
+        age,
+        gender,
+        motif,
+        mainColors,
+        subColors,
+        customFields,
+      }),
+    [
+      name,
+      nameKana,
+      worldId,
+      birthdayMode,
+      birthYear,
+      birthMonth,
+      birthDay,
+      birthFree,
+      age,
+      gender,
+      motif,
+      mainColors,
+      subColors,
+      customFields,
+    ]
+  );
+
+  const isDirty = currentSnapshot !== initialSnapshot;
+
+  useEffect(() => {
+    registerGuard((targetHref) => {
+      if (!isDirty) return false;
+      setPendingNavHref(targetHref);
+      return true;
+    });
+    return () => registerGuard(null);
+  }, [isDirty, registerGuard]);
+
+  useEffect(() => {
+    if (!isDirty) return;
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isDirty]);
+
+  const handleOpenCategoryDictionary = (category: CategoryKey) => {
+    setDictCategory(category);
+    setDictOpen(true);
+  };
 
   const handleOpenColorDictionary = (
     group: "main" | "sub",
@@ -237,12 +327,25 @@ export default function CharacterEditor({
     );
   };
 
-  const handleRemoveField = (id: string) => {
-    setCustomFields((prev) => prev.filter((f) => f.id !== id));
+  const handleRequestRemoveField = (field: CustomField) => {
+    const hasContent =
+      field.label.trim().length > 0 || field.value.trim().length > 0;
+    if (hasContent) {
+      setPendingDeleteField(field);
+      return;
+    }
+    setCustomFields((prev) => prev.filter((f) => f.id !== field.id));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleConfirmRemoveField = () => {
+    if (!pendingDeleteField) return;
+    setCustomFields((prev) =>
+      prev.filter((f) => f.id !== pendingDeleteField.id)
+    );
+    setPendingDeleteField(null);
+  };
+
+  const saveCharacter = (): boolean => {
     const input: CharacterCardInput = {
       name,
       nameKana,
@@ -258,18 +361,42 @@ export default function CharacterEditor({
     const error = validateCharacterInput(input);
     if (error) {
       setErrorMessage(error);
-      return;
+      return false;
     }
     if (initialCharacter) {
       updateCharacterCard(initialCharacter.id, input);
     } else {
       createCharacterCard(input);
     }
+    return true;
+  };
+
+  const proceedNavigation = (target: string) => {
+    if (target === "__CANCEL_DONE__") {
+      onDone?.();
+    } else {
+      router.push(target);
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!saveCharacter()) return;
+    registerGuard(null);
     if (onDone) {
       onDone();
     } else {
       router.push("/characters");
     }
+  };
+
+  const handleCancelClick = () => {
+    const target = onDone ? "__CANCEL_DONE__" : "/characters";
+    if (isDirty) {
+      setPendingNavHref(target);
+      return;
+    }
+    proceedNavigation(target);
   };
 
   const splitDirectionClass = [
@@ -282,9 +409,15 @@ export default function CharacterEditor({
   ].join(" ");
 
   return (
-    <div className={dictOpen ? "space-y-4" : "mx-auto max-w-3xl space-y-4"}>
+    <div
+      className={
+        dictOpen
+          ? "flex h-[calc(100dvh-5.5rem)] flex-col gap-3 overflow-hidden"
+          : "mx-auto max-w-3xl space-y-4"
+      }
+    >
       {/* 辞書パネル切り替えバー */}
-      <div className="flex items-center justify-end">
+      <div className="flex shrink-0 items-center justify-end">
         <button
           type="button"
           onClick={() => setDictOpen((prev) => !prev)}
@@ -300,7 +433,9 @@ export default function CharacterEditor({
 
       <div
         className={
-          dictOpen ? `flex gap-4 ${splitDirectionClass}` : "block"
+          dictOpen
+            ? `flex min-h-0 flex-1 gap-3 ${splitDirectionClass}`
+            : "block"
         }
       >
         <form
@@ -308,7 +443,7 @@ export default function CharacterEditor({
           autoComplete="off"
           className={`rounded-xl border border-border-subtle bg-surface shadow-sm ${
             dictOpen
-              ? "w-full lg:w-1/2 lg:max-h-[calc(100vh-10rem)] lg:overflow-y-auto"
+              ? "min-h-0 flex-1 overflow-y-auto lg:w-1/2"
               : "w-full"
           }`}
         >
@@ -554,20 +689,43 @@ export default function CharacterEditor({
 
       {/* モチーフ（テキスト・カラー） */}
       <div className="border-b border-border-subtle px-4 py-3.5 sm:px-6">
-        <div className="mb-1 flex items-center justify-between">
-          <label
-            htmlFor="char-motif"
-            className="text-xs font-semibold text-foreground-muted"
-          >
-            モチーフ
-          </label>
+        <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <label
+              htmlFor="oc-field-motif"
+              className="text-xs font-semibold text-foreground-muted"
+            >
+              モチーフ
+            </label>
+            {(
+              [
+                { key: "flower", label: "花" },
+                { key: "stone", label: "石" },
+                { key: "constellation", label: "星" },
+                { key: "idea", label: "アイデア" },
+              ] as const
+            ).map((btn) => (
+              <button
+                key={btn.key}
+                type="button"
+                onClick={() => handleOpenCategoryDictionary(btn.key)}
+                className="rounded border border-border-subtle bg-surface-muted/60 px-2 py-0.5 text-[11px] text-foreground-muted transition hover:bg-surface-muted hover:text-foreground"
+              >
+                {btn.label}
+              </button>
+            ))}
+          </div>
           <span className="text-[11px] text-foreground-muted">
             {motif.length} / {SETTING_LIMITS.MOTIF_MAX}
           </span>
         </div>
         <input
-          id="char-motif"
+          id="oc-field-motif"
+          name="oc-field-motif"
           type="text"
+          autoComplete="off"
+          data-lpignore="true"
+          data-1p-ignore="true"
           maxLength={SETTING_LIMITS.MOTIF_MAX}
           value={motif}
           onChange={(e) => setMotif(e.target.value)}
@@ -623,49 +781,62 @@ export default function CharacterEditor({
                 <div className="space-y-2">
                   {group.colors.map((color, index) => {
                     const safeColor = toSafePickerColor(color, group.fallback);
+                    const matchedColorName = userSettings.showColorName
+                      ? findColorNameByHex(color)
+                      : null;
                     return (
-                      <div
-                        key={`${group.title}-${index}`}
-                        className="flex flex-wrap items-center gap-1.5"
-                      >
-                        <label
-                          className="relative flex h-8 w-10 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-border-subtle shadow-xs"
-                          style={{ backgroundColor: safeColor }}
-                          title="クリックして色を選択"
-                        >
+                      <div key={`${group.title}-${index}`} className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <label
+                            className="relative flex h-8 w-10 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-border-subtle shadow-xs"
+                            style={{ backgroundColor: safeColor }}
+                            title="クリックして色を選択"
+                          >
+                            <input
+                              type="color"
+                              value={safeColor}
+                              aria-label={`${group.title}${index + 1}`}
+                              onChange={(e) =>
+                                group.onChange(index, e.target.value)
+                              }
+                              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                            />
+                          </label>
                           <input
-                            type="color"
-                            value={safeColor}
-                            aria-label={`${group.title}${index + 1}`}
-                            onChange={(e) => group.onChange(index, e.target.value)}
-                            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                            type="text"
+                            value={color}
+                            autoComplete="off"
+                            data-lpignore="true"
+                            maxLength={7}
+                            aria-label={`${group.title}${index + 1}コード`}
+                            onChange={(e) =>
+                              group.onChange(index, e.target.value)
+                            }
+                            className="w-20 rounded border border-border-subtle bg-surface px-2 py-1 font-mono text-xs uppercase text-foreground outline-none focus:border-foreground"
                           />
-                        </label>
-                        <input
-                          type="text"
-                          value={color}
-                          maxLength={7}
-                          aria-label={`${group.title}${index + 1}コード`}
-                          onChange={(e) => group.onChange(index, e.target.value)}
-                          className="w-20 rounded border border-border-subtle bg-surface px-2 py-1 font-mono text-xs uppercase text-foreground outline-none focus:border-foreground"
-                        />
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleOpenColorDictionary(group.key, index)
-                          }
-                          className="rounded border border-border-subtle bg-surface px-2 py-1 text-[11px] text-foreground-muted transition hover:bg-surface-muted hover:text-foreground"
-                        >
-                          辞書
-                        </button>
-                        {group.colors.length > group.min && (
                           <button
                             type="button"
-                            onClick={() => group.onRemove(index)}
-                            className="text-xs text-foreground-muted hover:text-danger"
+                            onClick={() =>
+                              handleOpenColorDictionary(group.key, index)
+                            }
+                            className="rounded border border-border-subtle bg-surface px-2 py-1 text-[11px] text-foreground-muted transition hover:bg-surface-muted hover:text-foreground"
                           >
-                            ✕
+                            辞書
                           </button>
+                          {group.colors.length > group.min && (
+                            <button
+                              type="button"
+                              onClick={() => group.onRemove(index)}
+                              className="text-xs text-foreground-muted hover:text-danger"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                        {matchedColorName && (
+                          <p className="text-[11px] text-foreground-muted">
+                            {matchedColorName}
+                          </p>
                         )}
                       </div>
                     );
@@ -715,7 +886,7 @@ export default function CharacterEditor({
             </span>
             <button
               type="button"
-              onClick={() => handleRemoveField(field.id)}
+              onClick={() => handleRequestRemoveField(field)}
               className="text-xs text-foreground-muted hover:text-danger"
             >
               削除
@@ -744,7 +915,7 @@ export default function CharacterEditor({
       <div className="flex flex-wrap items-center justify-end gap-2 px-4 py-4 sm:px-6">
         <button
           type="button"
-          onClick={() => (onDone ? onDone() : router.push("/characters"))}
+          onClick={handleCancelClick}
           className="rounded-lg border border-border-subtle px-4 py-2 text-sm text-foreground-muted transition hover:bg-surface-muted hover:text-foreground"
         >
           キャンセル
@@ -760,7 +931,7 @@ export default function CharacterEditor({
 
         {/* 2分割時の辞書パネル */}
         {dictOpen && (
-          <aside className="max-h-[45vh] w-full overflow-y-auto rounded-xl border border-border-subtle bg-surface p-4 shadow-sm lg:max-h-[calc(100vh-10rem)] lg:w-1/2">
+          <aside className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-border-subtle bg-surface p-4 shadow-sm lg:w-1/2">
             <div className="mb-3 flex items-center justify-between border-b border-border-subtle pb-2">
               <span className="text-xs font-bold text-foreground">
                 辞書パネル
@@ -819,6 +990,113 @@ export default function CharacterEditor({
           </aside>
         )}
       </div>
+
+      {/* 未保存離脱確認ポップアップ */}
+      {pendingNavHref && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-[2px]"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="unsaved-modal-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setPendingNavHref(null);
+          }}
+        >
+          <div className="w-full max-w-md rounded-2xl border border-border-subtle bg-surface p-6 shadow-2xl">
+            <h2
+              id="unsaved-modal-title"
+              className="mb-2 text-base font-bold text-foreground sm:text-lg"
+            >
+              編集中の内容を保存しますか？
+            </h2>
+            <p className="mb-6 text-sm leading-relaxed text-foreground-muted">
+              このまま移動すると、保存されていない変更内容は失われます。
+            </p>
+            <div className="flex flex-col gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  const target = pendingNavHref;
+                  if (!saveCharacter()) {
+                    setPendingNavHref(null);
+                    return;
+                  }
+                  registerGuard(null);
+                  setPendingNavHref(null);
+                  proceedNavigation(target);
+                }}
+                className="w-full rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-accent-foreground transition hover:opacity-90"
+              >
+                保存して移動
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const target = pendingNavHref;
+                  registerGuard(null);
+                  setPendingNavHref(null);
+                  proceedNavigation(target);
+                }}
+                className="w-full rounded-xl border border-border-subtle bg-surface-muted/60 px-4 py-3 text-sm font-medium text-foreground transition hover:bg-surface-muted"
+              >
+                保存せずに移動
+              </button>
+              <button
+                type="button"
+                onClick={() => setPendingNavHref(null)}
+                className="w-full rounded-xl border border-border-subtle px-4 py-2.5 text-sm text-foreground-muted transition hover:bg-surface-muted hover:text-foreground"
+              >
+                キャンセル
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* カスタム項目削除確認ポップアップ */}
+      {pendingDeleteField && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-[2px]"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-field-modal-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setPendingDeleteField(null);
+          }}
+        >
+          <div className="w-full max-w-md rounded-2xl border border-border-subtle bg-surface p-6 shadow-2xl">
+            <h2
+              id="delete-field-modal-title"
+              className="mb-2 text-base font-bold text-foreground sm:text-lg"
+            >
+              項目の削除確認
+            </h2>
+            <p className="mb-6 text-sm leading-relaxed text-foreground">
+              「
+              <span className="font-bold">
+                {pendingDeleteField.label.trim() || "無題の項目"}
+              </span>
+              」を削除してもよろしいですか？
+            </p>
+            <div className="flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setPendingDeleteField(null)}
+                className="rounded-xl border border-border-subtle px-5 py-2.5 text-sm text-foreground-muted transition hover:bg-surface-muted hover:text-foreground"
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmRemoveField}
+                className="rounded-xl bg-danger px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
+              >
+                削除する
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -14,6 +14,9 @@ export interface WorldCard {
   id: string;
   name: string;
   summary: string;
+  mainColors?: string[];
+  subColors?: string[];
+  customFields?: CustomField[];
   createdAt: string;
   updatedAt: string;
 }
@@ -22,6 +25,9 @@ export interface WorldCard {
 export interface WorldCardInput {
   name: string;
   summary: string;
+  mainColors: string[];
+  subColors: string[];
+  customFields: CustomField[];
 }
 
 /** キャラクター（OC）データ */

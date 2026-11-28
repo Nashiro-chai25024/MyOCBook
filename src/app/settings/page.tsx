@@ -72,6 +72,39 @@ export default function SettingsPage() {
           </div>
         </section>
 
+        {/* 色名の表示設定 */}
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border-subtle bg-surface p-5 shadow-xs">
+          <div>
+            <h2 className="mb-1 text-sm font-bold text-foreground">
+              選択した色の名前表示
+            </h2>
+            <p className="text-xs text-foreground-muted">
+              カラーコードが色辞書と一致するとき、色の下に名前を表示します。
+            </p>
+          </div>
+          <div className="inline-flex rounded-xl border border-border-subtle bg-surface-muted/70 p-1">
+            {[
+              { value: true, label: "オン" },
+              { value: false, label: "オフ" },
+            ].map((option) => (
+              <button
+                key={String(option.value)}
+                type="button"
+                onClick={() =>
+                  updateUserSettings({ showColorName: option.value })
+                }
+                className={`rounded-lg px-4 py-1.5 text-xs font-semibold transition ${
+                  settings.showColorName === option.value
+                    ? "bg-accent text-accent-foreground shadow-xs"
+                    : "text-foreground-muted hover:text-foreground"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </section>
+
         <section className="rounded-xl border border-border-subtle bg-surface p-5 shadow-xs">
           <h2 className="mb-1 text-sm font-bold text-foreground">
             編集中の辞書表示位置（2分割）

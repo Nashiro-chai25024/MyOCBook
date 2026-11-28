@@ -4,6 +4,7 @@
  */
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { NavigationGuardProvider } from "@/components/NavigationGuardContext";
 import ThemeSync from "@/components/ThemeSync";
 import "./globals.css";
 
@@ -30,7 +31,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         <ThemeSync />
-        {children}
+        <NavigationGuardProvider>{children}</NavigationGuardProvider>
       </body>
     </html>
   );

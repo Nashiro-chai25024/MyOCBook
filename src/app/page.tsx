@@ -71,7 +71,7 @@ export default function HomePage() {
               {worlds.slice(0, 8).map((world) => (
                 <Link
                   key={world.id}
-                  href="/worlds"
+                  href={`/worlds/${world.id}`}
                   className="flex h-20 w-20 items-center justify-center rounded-full border border-border-subtle bg-surface p-2 text-center text-xs font-medium text-foreground shadow-xs transition hover:border-foreground/50 hover:bg-surface-muted"
                 >
                   <span className="line-clamp-2 break-all">{world.name}</span>

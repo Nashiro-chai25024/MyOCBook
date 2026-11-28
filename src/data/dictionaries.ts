@@ -370,3 +370,15 @@ export function isCategoryKey(value: string): value is CategoryKey {
     value === "idea"
   );
 }
+
+/**
+ * カラーコード（#RRGGBB）に一致する色辞書の名前を返します（大文字・小文字は区別しません）。
+ */
+export function findColorNameByHex(hex: string): string | null {
+  const normalized = hex.trim().toLowerCase();
+  if (!normalized) return null;
+  const matched = DICTIONARY_CONFIG.color.rows.find(
+    (row) => row.colorHex?.toLowerCase() === normalized
+  );
+  return matched ? matched.col1 : null;
+}

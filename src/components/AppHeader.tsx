@@ -7,6 +7,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useNavigationGuard } from "@/components/NavigationGuardContext";
 
 interface AppHeaderProps {
   title: string;
@@ -28,6 +29,17 @@ export default function AppHeader({
 }: AppHeaderProps) {
   const isHomeBack = backHref === "/";
   const [menuOpen, setMenuOpen] = useState<boolean>(false);
+  const { requestNavigation } = useNavigationGuard();
+
+  const handleGuardedNavigate = (
+    e: React.MouseEvent<HTMLAnchorElement>,
+    href: string,
+    closeMenu = false
+  ) => {
+    e.preventDefault();
+    if (closeMenu) setMenuOpen(false);
+    requestNavigation(href);
+  };
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -45,6 +57,7 @@ export default function AppHeader({
           <div className="flex items-center gap-3">
             <Link
               href="/"
+              onClick={(e) => handleGuardedNavigate(e, "/")}
               className="text-lg font-bold tracking-tight text-foreground transition hover:opacity-75"
             >
               MyOCBook
@@ -52,6 +65,7 @@ export default function AppHeader({
             {backHref && (
               <Link
                 href={backHref}
+                onClick={(e) => handleGuardedNavigate(e, backHref)}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-border-subtle px-2.5 py-1 text-xs text-foreground-muted transition hover:bg-surface-muted hover:text-foreground"
               >
                 {isHomeBack && (
@@ -133,7 +147,7 @@ export default function AppHeader({
                 <Link
                   key={item.href}
                   href={item.href}
-                  onClick={() => setMenuOpen(false)}
+                  onClick={(e) => handleGuardedNavigate(e, item.href, true)}
                   className="block rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition hover:bg-surface-muted"
                 >
                   {item.label}
@@ -147,14 +161,14 @@ export default function AppHeader({
               </p>
               <Link
                 href="/settings"
-                onClick={() => setMenuOpen(false)}
+                onClick={(e) => handleGuardedNavigate(e, "/settings", true)}
                 className="block rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition hover:bg-surface-muted"
               >
                 設定
               </Link>
               <Link
                 href="/manage/delete"
-                onClick={() => setMenuOpen(false)}
+                onClick={(e) => handleGuardedNavigate(e, "/manage/delete", true)}
                 className="block rounded-lg px-3 py-2.5 text-sm font-medium text-danger transition hover:bg-danger/10"
               >
                 データの削除

@@ -4,6 +4,13 @@
  */
 "use client";
 
+import { useSyncExternalStore } from "react";
+import { findColorNameByHex } from "@/data/dictionaries";
+import {
+  getServerUserSettingsSnapshot,
+  loadUserSettings,
+  subscribeUserSettings,
+} from "@/lib/userSettings";
 import type { CharacterCard, WorldCard } from "@/types/setting";
 
 interface CharacterDetailViewProps {
@@ -17,6 +24,12 @@ export default function CharacterDetailView({
   world,
   onEdit,
 }: CharacterDetailViewProps) {
+  const userSettings = useSyncExternalStore(
+    subscribeUserSettings,
+    loadUserSettings,
+    getServerUserSettingsSnapshot
+  );
+
   return (
     <>
       <article className="mx-auto max-w-3xl rounded-xl border border-border-subtle bg-surface shadow-sm">
@@ -79,50 +92,45 @@ export default function CharacterDetailView({
           )}
 
           <div className="grid gap-3 rounded-lg bg-surface-muted/60 p-3 sm:grid-cols-2">
-            <div>
-              <span className="mb-1.5 block text-xs font-medium text-foreground-muted">
-                メインカラー
-              </span>
-              <div className="flex flex-wrap items-center gap-3">
-                {character.mainColors.map((color, index) => (
-                  <div key={`main-${index}`} className="flex items-center gap-1.5">
-                    <span
-                      className="h-6 w-6 rounded-md border border-black/15 shadow-xs"
-                      style={{ backgroundColor: color }}
-                    />
-                    <span className="font-mono text-xs uppercase text-foreground-muted">
-                      {color}
-                    </span>
+            {[
+              { title: "メインカラー", colors: character.mainColors },
+              { title: "サブカラー", colors: character.subColors },
+            ].map((group) => (
+              <div key={group.title}>
+                <span className="mb-1.5 block text-xs font-medium text-foreground-muted">
+                  {group.title}
+                </span>
+                {group.colors.length === 0 ? (
+                  <span className="text-xs text-foreground-muted">未設定</span>
+                ) : (
+                  <div className="flex flex-wrap items-start gap-3">
+                    {group.colors.map((color, index) => {
+                      const colorName = userSettings.showColorName
+                        ? findColorNameByHex(color)
+                        : null;
+                      return (
+                        <div key={`${group.title}-${index}`} className="space-y-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              className="h-6 w-6 rounded-md border border-black/15 shadow-xs"
+                              style={{ backgroundColor: color }}
+                            />
+                            <span className="font-mono text-xs uppercase text-foreground-muted">
+                              {color}
+                            </span>
+                          </div>
+                          {colorName && (
+                            <p className="text-[11px] text-foreground-muted">
+                              {colorName}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                ))}
+                )}
               </div>
-            </div>
-
-            <div>
-              <span className="mb-1.5 block text-xs font-medium text-foreground-muted">
-                サブカラー
-              </span>
-              {character.subColors.length === 0 ? (
-                <span className="text-xs text-foreground-muted">未設定</span>
-              ) : (
-                <div className="flex flex-wrap items-center gap-3">
-                  {character.subColors.map((color, index) => (
-                    <div
-                      key={`sub-${index}`}
-                      className="flex items-center gap-1.5"
-                    >
-                      <span
-                        className="h-6 w-6 rounded-md border border-black/15 shadow-xs"
-                        style={{ backgroundColor: color }}
-                      />
-                      <span className="font-mono text-xs uppercase text-foreground-muted">
-                        {color}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            ))}
           </div>
         </div>
 

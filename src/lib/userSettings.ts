@@ -10,6 +10,7 @@ export interface UserSettings {
   pcDictionarySide: PcDictionarySide;
   mobileDictionarySide: MobileDictionarySide;
   theme: ThemeMode;
+  showColorName: boolean;
 }
 
 const SETTINGS_KEY = "myocbook_user_settings_v1";
@@ -19,6 +20,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   pcDictionarySide: "right",
   mobileDictionarySide: "bottom",
   theme: "system",
+  showColorName: true,
 };
 
 let cachedRaw: string | null = null;
@@ -44,6 +46,8 @@ export function loadUserSettings(): UserSettings {
         parsed.theme === "light" || parsed.theme === "dark"
           ? parsed.theme
           : "system",
+      showColorName:
+        typeof parsed.showColorName === "boolean" ? parsed.showColorName : true,
     };
     cachedRaw = raw;
     cachedSettings = normalized;

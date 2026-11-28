@@ -49,6 +49,26 @@ export function validateWorldInput(input: WorldCardInput): string | null {
   if (input.summary.length > SETTING_LIMITS.SUMMARY_MAX) {
     return `概要は${SETTING_LIMITS.SUMMARY_MAX}文字以内で入力してください。`;
   }
+  if (
+    input.mainColors.length < SETTING_LIMITS.MAIN_COLORS_MIN ||
+    input.mainColors.length > SETTING_LIMITS.MAIN_COLORS_MAX
+  ) {
+    return `メインカラーは${SETTING_LIMITS.MAIN_COLORS_MIN}〜${SETTING_LIMITS.MAIN_COLORS_MAX}色で指定してください。`;
+  }
+  if (input.subColors.length > SETTING_LIMITS.SUB_COLORS_MAX) {
+    return `サブカラーは最大${SETTING_LIMITS.SUB_COLORS_MAX}色までです。`;
+  }
+  if (![...input.mainColors, ...input.subColors].every(isValidHexColor)) {
+    return "カラーコードの形式が正しくありません。";
+  }
+  for (const field of input.customFields) {
+    if (field.label.length > SETTING_LIMITS.FIELD_LABEL_MAX) {
+      return `項目名は${SETTING_LIMITS.FIELD_LABEL_MAX}文字以内で入力してください。`;
+    }
+    if (field.value.length > SETTING_LIMITS.FIELD_VALUE_MAX) {
+      return `設定内容は${SETTING_LIMITS.FIELD_VALUE_MAX}文字以内で入力してください。`;
+    }
+  }
   return null;
 }
 
@@ -166,6 +186,9 @@ export function createWorldCard(input: WorldCardInput): WorldCard {
     id: createId(),
     name: input.name.trim().slice(0, SETTING_LIMITS.NAME_MAX),
     summary: input.summary.trim().slice(0, SETTING_LIMITS.SUMMARY_MAX),
+    mainColors: input.mainColors.slice(0, SETTING_LIMITS.MAIN_COLORS_MAX),
+    subColors: input.subColors.slice(0, SETTING_LIMITS.SUB_COLORS_MAX),
+    customFields: sanitizeCustomFields(input.customFields),
     createdAt: now,
     updatedAt: now,
   };
@@ -181,11 +204,33 @@ export function updateWorldCard(id: string, input: WorldCardInput): void {
           ...w,
           name: input.name.trim().slice(0, SETTING_LIMITS.NAME_MAX),
           summary: input.summary.trim().slice(0, SETTING_LIMITS.SUMMARY_MAX),
+          mainColors: input.mainColors.slice(0, SETTING_LIMITS.MAIN_COLORS_MAX),
+          subColors: input.subColors.slice(0, SETTING_LIMITS.SUB_COLORS_MAX),
+          customFields: sanitizeCustomFields(input.customFields),
           updatedAt: now,
         }
       : w
   );
   saveWorlds(updated);
+}
+
+/** 指定した世界に所属させるキャラクター一覧をまとめて更新します */
+export function assignCharactersToWorld(
+  worldId: string,
+  selectedCharacterIds: string[]
+): void {
+  const selectedSet = new Set(selectedCharacterIds);
+  const now = new Date().toISOString();
+  const updated = loadCharacters().map((c) => {
+    if (selectedSet.has(c.id)) {
+      return c.worldId === worldId ? c : { ...c, worldId, updatedAt: now };
+    }
+    if (c.worldId === worldId) {
+      return { ...c, worldId: null, updatedAt: now };
+    }
+    return c;
+  });
+  saveCharacters(updated);
 }
 
 /** 世界観を削除します。deleteAssignedCharacters が true の場合は所属キャラクターも削除します */

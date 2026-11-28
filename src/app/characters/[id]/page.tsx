@@ -52,7 +52,7 @@ export default function CharacterDetailPage() {
         backHref="/characters"
         backLabel="一覧へ"
       />
-      <main className="mx-auto max-w-7xl px-4 py-6 pb-24 sm:px-6">
+      <main className="mx-auto w-full max-w-7xl px-4 py-3 sm:px-6 sm:py-4">
         {!isLoaded ? (
           <p className="text-sm text-foreground-muted">読み込み中...</p>
         ) : !target ? (

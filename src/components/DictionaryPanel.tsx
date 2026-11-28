@@ -91,6 +91,11 @@ export default function DictionaryPanel({
 
   return (
     <div className="space-y-3">
+      {hasInteractiveAction && (
+        <p className="text-[11px] text-foreground-muted">
+          行をタップすると編集中のキャラクターへ反映されます
+        </p>
+      )}
       {/* カテゴリ切替タブ（2分割パネル時） */}
       {allowCategorySwitch && (
         <div className="flex flex-wrap gap-1.5">
